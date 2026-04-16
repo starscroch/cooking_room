@@ -1,10 +1,10 @@
-name: Moonell Unified Build
+name: moonell kernel build
 
 on:
   workflow_dispatch:
     inputs:
       repository: { description: 'Repo', required: true, default: 'KaiFujiro/kernel_xiaomi_sm8250' }
-      branch: { description: 'Branch', required: true, default: 'aosp-16' }
+      branch: { description: 'Branch', required: true, default: 'canary' }
       defconfig: { description: 'Defconfig', required: true, default: 'vendor/alioth_defconfig' }
       kernelsu_branch: { description: 'KSU Branch', required: false, default: 'master' }
       toolchain: 
@@ -78,7 +78,7 @@ jobs:
 
         # Packaging
         if [ -f out/arch/arm64/boot/Image ]; then
-          ZIP_NAME="Alexandra-Unified-$BUILD_TIME.zip"
+          ZIP_NAME="imell-$BUILD_TIME.zip"
           mkdir -p dts_output
           find out/arch/arm64/boot/dts/ -name "*.dtb" -exec cp {} ./ \; 2>/dev/null || true
           
