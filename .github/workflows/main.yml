@@ -10,10 +10,11 @@ on:
       toolchain: 
         description: 'toolchain'
         required: true
-        default: 'AOSP'
+        default: 'AOSP-r596125'
         type: choice
         options:
-          - AOSP
+          - AOSP-r596125
+          - AOSP-Old
           - Playground
           - mandisa
 
@@ -48,7 +49,10 @@ jobs:
         echo "BUILD_TIME=$BUILD_TIME" >> $GITHUB_ENV
         
         mkdir -p tc
-        if [ "${{ github.event.inputs.toolchain }}" = "Playground" ]; then
+        if [ "${{ github.event.inputs.toolchain }}" = "AOSP-r596125" ]; then
+            echo "Downloading AOSP Clang r596125..."
+            wget -qO- https://github.com/bachnxuan/aosp_clang_mirror/releases/download/clang-r596125-15241605/clang-r596125.tar.gz | tar -xz -C tc
+        elif [ "${{ github.event.inputs.toolchain }}" = "Playground" ]; then
             echo "Downloading Playground Toolchain..."
             git clone --depth=1 https://github.com/KaiFujiro/playgroundtc -b 17 tc
         elif [ "${{ github.event.inputs.toolchain }}" = "mandisa" ]; then
@@ -61,13 +65,10 @@ jobs:
             wget -qO- https://github.com/moonooen/AOSP20/releases/download/v1.0/clang-r547379-qssi.tar.gz | tar -xz -C tc
         fi
         
-        # Set Path
         export PATH=$PWD/tc/bin:$PATH
         
-        # Setup KernelSU
         curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/master/kernel/setup.sh" | bash -s ${{ github.event.inputs.kernelsu_branch }}
 
-        # Build Kernel
         export ARCH=arm64
         ARGS="O=out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1"
         
@@ -76,7 +77,6 @@ jobs:
         make $ARGS dtb.img || true
         make -j$(nproc) $ARGS 2>&1 | tee compile.log
 
-        # Packaging
         if [ -f out/arch/arm64/boot/Image ]; then
           ZIP_NAME="imell-$BUILD_TIME.zip"
           mkdir -p dts_output
