@@ -10,7 +10,7 @@ on:
       toolchain: 
         description: 'toolchain'
         required: true
-        default: 'aosp-21'
+        default: 'aosp-20'
         type: choice
         options:
           - aosp-21
@@ -46,22 +46,23 @@ jobs:
         
         export TZ="Asia/Jakarta"
         BUILD_TIME=$(date +'%H%M-%d%m%y')
+        HASH=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 8)
         echo "BUILD_TIME=$BUILD_TIME" >> $GITHUB_ENV
         
         mkdir -p tc
         if [ "${{ github.event.inputs.toolchain }}" = "aosp-21" ]; then
-          echo "Downloading AOSP Clang r574158..."
+          echo "downloading aosp clang 21 r574158..."
           wget -qO- https://github.com/bachnxuan/aosp_clang_mirror/releases/download/clang-r574158-14475230/clang-r574158.tar.gz | tar -xz -C tc
         elif [ "${{ github.event.inputs.toolchain }}" = "playground" ]; then
-          echo "Downloading Playground Toolchain..."
+          echo "downloading playground toolchain..."
           git clone --depth=1 https://github.com/KaiFujiro/playgroundtc -b 17 tc
         elif [ "${{ github.event.inputs.toolchain }}" = "mandisa" ]; then
-          echo "Downloading Mandisa Toolchain (LLVM 20)..."
+          echo "downloading mandisa toolchain 20..."
           wget -q https://github.com/Mandi-Sa/clang/releases/download/amd64-full-toolchain-20/llvm20.0.0-binutils2.43.1_amd64-full-toolchain-20250108.7z -O toolchain.7z
           7z x toolchain.7z -otc
           rm toolchain.7z
         else
-          echo "Downloading AOSP 20 Clang (r547379)..."
+          echo "downloading aosp 20 clang..."
           wget -qO- https://github.com/moonooen/AOSP20/releases/download/v1.0/clang-r547379-qssi.tar.gz | tar -xz -C tc
         fi
         
@@ -78,7 +79,7 @@ jobs:
         make -j$(nproc) $ARGS 2>&1 | tee compile.log
 
         if [ -f out/arch/arm64/boot/Image ]; then
-          ZIP_NAME="imell-$BUILD_TIME.zip"
+          ZIP_NAME="imell-$HASH.zip"
           
           git clone --depth=1 https://github.com/KaiFujiro/anykernel anykernel
           
