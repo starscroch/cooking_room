@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       repository: { description: 'Repo', required: true, default: 'KaiFujiro/kernel_xiaomi_sm8250' }
-      branch: { description: 'Branch', required: true, default: 'aosp-16' }
+      branch: { description: 'Branch', required: true, default: 'experimental' }
       defconfig: { description: 'Defconfig', required: true, default: 'vendor/alioth_defconfig' }
       kernelsu_branch: { description: 'KSU Branch', required: false, default: 'master' }
       toolchain: 
