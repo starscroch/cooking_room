@@ -10,7 +10,7 @@ on:
       toolchain: 
         description: 'toolchain'
         required: true
-        default: 'aosp-21'
+        default: 'aosp-20'
         type: choice
         options:
           - aosp-21
@@ -46,7 +46,7 @@ jobs:
         
         export TZ="Asia/Jakarta"
         BUILD_TIME=$(date +'%H%M-%d%m%y')
-        # Menghasilkan 11 karakter acak (hanya huruf kecil dan angka)
+        
         HASH=$(head /dev/urandom | tr -dc a-z0-9 | head -c 11)
         echo "BUILD_TIME=$BUILD_TIME" >> $GITHUB_ENV
         
