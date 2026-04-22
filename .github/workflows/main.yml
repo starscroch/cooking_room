@@ -1,22 +1,20 @@
-name: moonell kernel build
+name: Moonell Unified Build
 
 on:
   workflow_dispatch:
     inputs:
       repository: { description: 'Repo', required: true, default: 'KaiFujiro/kernel_xiaomi_sm8250' }
-      branch: { description: 'Branch', required: true, default: 'experimental' }
+      branch: { description: 'Branch', required: true, default: 'aosp-16' }
       defconfig: { description: 'Defconfig', required: true, default: 'vendor/alioth_defconfig' }
       kernelsu_branch: { description: 'KSU Branch', required: false, default: 'master' }
       toolchain: 
         description: 'toolchain'
         required: true
-        default: 'aosp-20'
+        default: 'AOSP'
         type: choice
         options:
-          - aosp-21
-          - aosp-20
-          - playground
-          - mandisa
+          - AOSP
+          - Playground
 
 env:
   CHAT_ID: "7538384857"
@@ -42,35 +40,28 @@ jobs:
 
     - name: Setup and Build
       run: |
-        sudo apt-get update && sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi python3 python-is-python3 git wget curl device-tree-compiler p7zip-full
+        sudo apt-get update && sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi python3 python-is-python3 git wget curl device-tree-compiler
         
         export TZ="Asia/Jakarta"
         BUILD_TIME=$(date +'%H%M-%d%m%y')
-        
-        HASH=$(head /dev/urandom | tr -dc a-z0-9 | head -c 11)
         echo "BUILD_TIME=$BUILD_TIME" >> $GITHUB_ENV
         
         mkdir -p tc
-        if [ "${{ github.event.inputs.toolchain }}" = "aosp-21" ]; then
-          echo "Downloading AOSP Clang r574158..."
-          wget -qO- https://github.com/bachnxuan/aosp_clang_mirror/releases/download/clang-r574158-14475230/clang-r574158.tar.gz | tar -xz -C tc
-        elif [ "${{ github.event.inputs.toolchain }}" = "playground" ]; then
-          echo "Downloading Playground Toolchain..."
-          git clone --depth=1 https://github.com/KaiFujiro/playgroundtc -b 17 tc
-        elif [ "${{ github.event.inputs.toolchain }}" = "mandisa" ]; then
-          echo "Downloading Mandisa Toolchain (LLVM 20)..."
-          wget -q https://github.com/Mandi-Sa/clang/releases/download/amd64-full-toolchain-20/llvm20.0.0-binutils2.43.1_amd64-full-toolchain-20250108.7z -O toolchain.7z
-          7z x toolchain.7z -otc
-          rm toolchain.7z
+        if [ "${{ github.event.inputs.toolchain }}" = "Playground" ]; then
+            echo "Downloading Playground Toolchain..."
+            git clone --depth=1 https://github.com/KaiFujiro/playgroundtc -b 17 tc
         else
-          echo "Downloading AOSP 20 Clang (r547379)..."
-          wget -qO- https://github.com/moonooen/AOSP20/releases/download/v1.0/clang-r547379-qssi.tar.gz | tar -xz -C tc
+            echo "Downloading AOSP 20 Clang (r547379)..."
+            wget -qO- https://github.com/moonooen/AOSP20/releases/download/v1.0/clang-r547379-qssi.tar.gz | tar -xz -C tc
         fi
         
+        # Set Path
         export PATH=$PWD/tc/bin:$PATH
         
+        # Setup KernelSU
         curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/master/kernel/setup.sh" | bash -s ${{ github.event.inputs.kernelsu_branch }}
 
+        # Build Kernel
         export ARCH=arm64
         ARGS="O=out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1"
         
@@ -79,25 +70,23 @@ jobs:
         make $ARGS dtb.img || true
         make -j$(nproc) $ARGS 2>&1 | tee compile.log
 
+        # Packaging
         if [ -f out/arch/arm64/boot/Image ]; then
-          ZIP_NAME="imell-$HASH.zip"
+          ZIP_NAME="Alexandra-Unified-$BUILD_TIME.zip"
+          mkdir -p dts_output
+          find out/arch/arm64/boot/dts/ -name "*.dtb" -exec cp {} ./ \; 2>/dev/null || true
           
-          git clone --depth=1 https://github.com/KaiFujiro/anykernel anykernel
+          for f in *.dtb; do
+            if [ -f "$f" ]; then
+              dtc -I dtb -O dts -o "dts_output/${f}.dts" "$f"
+            fi
+          done
+
+          [ -f out/arch/arm64/boot/dtb.img ] && cp out/arch/arm64/boot/dtb.img ./ || true
+          [ -f out/arch/arm64/boot/dtbo.img ] && cp out/arch/arm64/boot/dtbo.img ./ || true
+          cp out/arch/arm64/boot/Image ./
           
-          cp out/arch/arm64/boot/Image anykernel/
-          
-          if [ -f out/arch/arm64/boot/dtb.img ]; then
-            cp out/arch/arm64/boot/dtb.img anykernel/dtb
-          fi
-          
-          if [ -f out/arch/arm64/boot/dtbo.img ]; then
-            cp out/arch/arm64/boot/dtbo.img anykernel/
-          fi
-          
-          cd anykernel
-          zip -r "../$ZIP_NAME" ./*
-          cd ..
-          
+          zip -r "$ZIP_NAME" Image *.dtb *.img dts_output/
           echo "FINAL_ZIP=$ZIP_NAME" >> $GITHUB_ENV
         fi
 
@@ -114,4 +103,4 @@ jobs:
       if: always()
       run: |
         [ -f "compile.log" ] && curl -s -F document=@"compile.log" "https://api.telegram.org/bot${{ env.BOT_TOKEN }}/sendDocument" -F chat_id="${{ env.CHAT_ID }}" -F caption="Build log"
-        [ -f "${{ env.FINAL_ZIP }}" ] && curl -s -F document=@"${{ env.FINAL_ZIP }}" "https://api.telegram.org/bot${{ env.BOT_TOKEN }}/sendDocument" -F chat_id="${{ env.CHAT_ID }}" -F caption="buildnya selesaiii⭐💜!!!"
+        [ -f "${{ env.FINAL_ZIP }}" ] && curl -s -F document=@"${{ env.FINAL_ZIP }}" "https://api.telegram.org/bot${{ env.BOT_TOKEN }}/sendDocument" -F chat_id="${{ env.CHAT_ID }}" -F caption="Build Alioth Selesai!!!"
